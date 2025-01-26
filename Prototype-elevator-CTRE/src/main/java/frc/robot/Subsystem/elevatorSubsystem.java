@@ -24,6 +24,7 @@ import edu.wpi.first.math.controller.ElevatorFeedforward;
 import edu.wpi.first.units.measure.MutDistance;
 import edu.wpi.first.units.measure.MutLinearVelocity;
 import edu.wpi.first.units.measure.MutVoltage;
+import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
@@ -91,6 +92,7 @@ public class elevatorSubsystem extends SubsystemBase{
         
         motorOutputElevMotor_L.NeutralMode = NeutralModeValue.Brake;
 
+
         configElevator_L.CurrentLimits.StatorCurrentLimit = Constants.elevatorCurrentLimit;
         configElevator_L.CurrentLimits.StatorCurrentLimitEnable = true;
         // configElevator_L.Voltage.PeakForwardVoltage = Constants.upVoltageCompensation;
@@ -121,7 +123,7 @@ public class elevatorSubsystem extends SubsystemBase{
             state ->SignalLogger.writeString("state",state.toString())
         ),
         new SysIdRoutine.Mechanism(
-            volts ->elevMotor_R.setControl(elevator_voltageOut.withOutput(volts)),
+            volts ->setVoltage(volts),
             log ->{
                 log.motor("wrist-corol")
                 .voltage(m_voltageOut.mut_replace(
@@ -149,6 +151,10 @@ public class elevatorSubsystem extends SubsystemBase{
              elevMotor_R.optimizeBusUtilization();
 
              SignalLogger.start();
+         }
+         public void setVoltage(Voltage volts){
+            elevMotor_R.setControl(elevator_voltageOut.withOutput(volts));
+            elevMotor_L.setControl(elevator_voltageOut.withOutput(volts));
          }
 
          public Command jotStickDriveCommand(DoubleSupplier output){
