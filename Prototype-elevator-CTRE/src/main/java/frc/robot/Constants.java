@@ -1,4 +1,4 @@
-package frc;
+package frc.robot;
 
 public final class Constants {
         //CAN ID

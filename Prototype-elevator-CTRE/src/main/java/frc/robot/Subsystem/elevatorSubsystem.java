@@ -1,9 +1,8 @@
 package frc.robot.Subsystem;
-import frc.Constants;
+import frc.robot.*;
 
 import static edu.wpi.first.units.Units.Volts;
 
-import java.lang.Thread.State;
 import java.util.function.DoubleSupplier;
 
 import com.ctre.phoenix6.BaseStatusSignal;
@@ -15,26 +14,21 @@ import com.ctre.phoenix6.configs.TalonFXConfigurator;
 import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.PositionDutyCycle;
-import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
-import com.revrobotics.RelativeEncoder;
+
 
 import edu.wpi.first.math.controller.ElevatorFeedforward;
 import edu.wpi.first.units.measure.MutDistance;
 import edu.wpi.first.units.measure.MutLinearVelocity;
 import edu.wpi.first.units.measure.MutVoltage;
-import edu.wpi.first.wpilibj.DutyCycle;
-import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
-import static edu.wpi.first.units.Units.Meter;
+import static edu.wpi.first.units.Units.Meters;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Seconds;
 
@@ -46,8 +40,13 @@ public class elevatorSubsystem extends SubsystemBase{
     private final ElevatorFeedforward elevatorFeedforward = new ElevatorFeedforward(Constants.elevator_KS,Constants.elevator_KG, Constants.elevator_KV);
 
     private final PositionDutyCycle elevPosition = new PositionDutyCycle(0).withSlot(0);
-    private final VoltageOut sysIDVoltageOut = new VoltageOut(0);
     private final NeutralOut m_brake = new NeutralOut();
+
+    private final VoltageOut elevator_voltageOut = new VoltageOut(0);
+    private final MutVoltage m_voltageOut = Volts.mutable(0);
+    private final MutDistance m_distance = Meters.mutable(0);
+    private final MutLinearVelocity m_velocity = MetersPerSecond.mutable(0);
+
 
     // public elevatorSubsystem(){
     //     configElevMotor_R();
@@ -122,11 +121,17 @@ public class elevatorSubsystem extends SubsystemBase{
             state ->SignalLogger.writeString("state",state.toString())
         ),
         new SysIdRoutine.Mechanism(
-            volts ->elevMotor_R.setControl(sysIDVoltageOut.withOutput(volts)),
-            null,
-            this
-            )
-         );
+            volts ->elevMotor_R.setControl(elevator_voltageOut.withOutput(volts)),
+            log ->{
+                log.motor("wrist-corol")
+                .voltage(m_voltageOut.mut_replace(
+                    elevMotor_R.getMotorVoltage().getValueAsDouble(), Volts))
+                .linearPosition(m_distance.mut_replace(
+                    getElevatorPosition(), Meters))
+                .linearVelocity(m_velocity.mut_replace(
+                    getElevatorVelocity(), MetersPerSecond));
+            },
+            this));
 
          public elevatorSubsystem(){
             setName("elevator");
@@ -154,6 +159,15 @@ public class elevatorSubsystem extends SubsystemBase{
          }
          public Command sysIdDymamic(SysIdRoutine.Direction direction){
             return m_SysIdRoutine.dynamic(direction);
+         }
+
+
+         private double getElevatorPosition(){
+            return elevMotor_R.getPosition().getValueAsDouble()*Math.PI*2*Constants.elevator_Max_Length;
+         }
+
+         private double getElevatorVelocity(){
+            return elevMotor_R.getVelocity().getValueAsDouble()*Math.PI*2*Constants.elevator_Max_Length;
          }
         
 }
