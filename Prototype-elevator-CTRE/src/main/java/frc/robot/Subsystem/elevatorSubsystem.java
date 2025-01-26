@@ -12,6 +12,7 @@ import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfigurator;
 import com.ctre.phoenix6.controls.DutyCycleOut;
+import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.PositionDutyCycle;
 import com.ctre.phoenix6.controls.VoltageOut;
@@ -61,7 +62,7 @@ public class elevatorSubsystem extends SubsystemBase{
         MotorOutputConfigs motorOutputElevMotor_R = new MotorOutputConfigs();
         TalonFXConfigurator elevMotor_RConfigurator = elevMotor_R.getConfigurator();
 
-        motorOutputElevMotor_R.Inverted = InvertedValue.Clockwise_Positive;
+        // motorOutputElevMotor_R.Inverted = InvertedValue.CounterClockwise_Positive;
         motorOutputElevMotor_R.NeutralMode = NeutralModeValue.Brake;
 
         configElevMotor_R.CurrentLimits.StatorCurrentLimit = Constants.elevatorCurrentLimit;
@@ -70,9 +71,9 @@ public class elevatorSubsystem extends SubsystemBase{
 
         //SoftLimit
         configElevMotor_R.SoftwareLimitSwitch.ForwardSoftLimitThreshold = Constants.elevator_Max_Length;
-        configElevMotor_R.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
+        configElevMotor_R.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
         configElevMotor_R.SoftwareLimitSwitch.ReverseSoftLimitThreshold = Constants.elevator_Min_Length;
-        configElevMotor_R.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
+        configElevMotor_R.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
 
         configElevMotor_R.Feedback.SensorToMechanismRatio = (Constants.m_sensorToMechanismRatio);
 
@@ -84,6 +85,7 @@ public class elevatorSubsystem extends SubsystemBase{
         elevMotor_RConfigurator.apply(motorOutputElevMotor_R);
     }
     private void configElevMotor_L(){
+        
         TalonFXConfiguration configElevator_L = new TalonFXConfiguration();
         MotorOutputConfigs motorOutputElevMotor_L = new MotorOutputConfigs();
         TalonFXConfigurator elevMotor_LConfigurator = elevMotor_L.getConfigurator();
@@ -91,17 +93,16 @@ public class elevatorSubsystem extends SubsystemBase{
         // motorOutputElevMotor_L.Inverted = InvertedValue.CounterClockwise_Positive;(no inverted)\
         
         motorOutputElevMotor_L.NeutralMode = NeutralModeValue.Brake;
-
-
+        
         configElevator_L.CurrentLimits.StatorCurrentLimit = Constants.elevatorCurrentLimit;
         configElevator_L.CurrentLimits.StatorCurrentLimitEnable = true;
         // configElevator_L.Voltage.PeakForwardVoltage = Constants.upVoltageCompensation;
 
         //SoftLimit
         configElevator_L.SoftwareLimitSwitch.ForwardSoftLimitThreshold = Constants.elevator_Max_Length;
-        configElevator_L.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
+        configElevator_L.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
         configElevator_L.SoftwareLimitSwitch.ReverseSoftLimitThreshold = Constants.elevator_Min_Length;
-        configElevator_L.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
+        configElevator_L.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
 
         configElevator_L.Feedback.SensorToMechanismRatio = (Constants.m_sensorToMechanismRatio);
 
@@ -119,11 +120,12 @@ public class elevatorSubsystem extends SubsystemBase{
             new SysIdRoutine.Config(
             null,
             Volts.of(4),
-            Seconds.of(5),
+            null,
             state ->SignalLogger.writeString("state",state.toString())
         ),
         new SysIdRoutine.Mechanism(
-            volts ->setVoltage(volts),
+            volts ->{elevMotor_R.setControl(elevator_voltageOut.withOutput(volts));
+                    elevMotor_L.setControl(new Follower(0, true));},
             log ->{
                 log.motor("wrist-corol")
                 .voltage(m_voltageOut.mut_replace(
@@ -152,10 +154,10 @@ public class elevatorSubsystem extends SubsystemBase{
 
              SignalLogger.start();
          }
-         public void setVoltage(Voltage volts){
-            elevMotor_R.setControl(elevator_voltageOut.withOutput(volts));
-            elevMotor_L.setControl(elevator_voltageOut.withOutput(volts));
-         }
+        //  public void setVoltage(Voltage volts){
+        //     elevMotor_R.setControl(elevator_voltageOut.withOutput(volts));
+        //     elevMotor_L.setControl(elevator_voltageOut.withOutput(volts));
+        //  }
 
          public Command jotStickDriveCommand(DoubleSupplier output){
             return run(()->elevMotor_R.setControl(elevControl.withOutput(output.getAsDouble())));

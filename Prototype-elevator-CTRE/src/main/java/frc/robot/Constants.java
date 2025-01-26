@@ -2,8 +2,8 @@ package frc.robot;
 
 public final class Constants {
         //CAN ID
-        public static final int elevMotor_RID = 1;
-        public static final int elevMotor_LID = 2;
+        public static final int elevMotor_RID = 0;
+        public static final int elevMotor_LID = 1;
 
         //PID Value
         public static final double elevator_KP = 0.001;
