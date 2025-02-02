@@ -15,6 +15,8 @@ import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.PositionDutyCycle;
+import com.ctre.phoenix6.controls.PositionTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -41,28 +43,39 @@ public class elevatorSubsystem extends SubsystemBase{
     private final DutyCycleOut elevControl = new DutyCycleOut(0);
     private final ElevatorFeedforward elevatorFeedforward = new ElevatorFeedforward(Constants.elevator_KS,Constants.elevator_KG, Constants.elevator_KV);
 
-    private final PositionDutyCycle elevPosition = new PositionDutyCycle(0).withSlot(0);
-    private final NeutralOut m_brake = new NeutralOut();
+    private final PositionDutyCycle elevPosition = new PositionDutyCycle(0).withSlot(0);   
 
     private final VoltageOut elevator_voltageOut = new VoltageOut(0);
     private final MutVoltage m_voltageOut = Volts.mutable(0);
     private final MutDistance m_distance = Meters.mutable(0);
     private final MutLinearVelocity m_velocity = MetersPerSecond.mutable(0);
 
+    private final PositionVoltage elevPositionVoltage = new PositionVoltage(0).withSlot(0);
+    private final PositionTorqueCurrentFOC elevPositionTorque = new PositionTorqueCurrentFOC(0).withSlot(1);
+    private final NeutralOut m_brake = new NeutralOut();
 
-    // public elevatorSubsystem(){
-    //     configElevMotor_R();
-    //     configElevMotor_L();
-    // }
+//control
+    private void resetToZero(){
+        elevMotor_R.setPosition(0);
+        elevMotor_L.setPosition(0);
+    }
+
+    public void setElevatorTargetPosition(double position){
+        //elevMotor_L.setPosition(position);
+        //elevMotor_R.setPosition(position);
+        elevMotor_R.setControl(elevPosition.withPosition(position).withFeedForward(elevatorFeedforward.calculate(0)));
+        elevMotor_L.setControl(elevPosition.withPosition(position).withFeedForward(elevatorFeedforward.calculate(0)));
+    }
 
 
 
+//set the robot
     private void configElevMotor_R(){
         TalonFXConfiguration configElevMotor_R = new TalonFXConfiguration();
         MotorOutputConfigs motorOutputElevMotor_R = new MotorOutputConfigs();
         TalonFXConfigurator elevMotor_RConfigurator = elevMotor_R.getConfigurator();
 
-        // motorOutputElevMotor_R.Inverted = InvertedValue.CounterClockwise_Positive;
+        motorOutputElevMotor_R.Inverted = InvertedValue.Clockwise_Positive;
         motorOutputElevMotor_R.NeutralMode = NeutralModeValue.Brake;
 
         configElevMotor_R.CurrentLimits.StatorCurrentLimit = Constants.elevatorCurrentLimit;
@@ -71,9 +84,9 @@ public class elevatorSubsystem extends SubsystemBase{
 
         //SoftLimit
         configElevMotor_R.SoftwareLimitSwitch.ForwardSoftLimitThreshold = Constants.elevator_Max_Length;
-        configElevMotor_R.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
+        configElevMotor_R.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
         configElevMotor_R.SoftwareLimitSwitch.ReverseSoftLimitThreshold = Constants.elevator_Min_Length;
-        configElevMotor_R.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
+        configElevMotor_R.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
 
         configElevMotor_R.Feedback.SensorToMechanismRatio = (Constants.m_sensorToMechanismRatio);
 
@@ -96,13 +109,14 @@ public class elevatorSubsystem extends SubsystemBase{
         
         configElevator_L.CurrentLimits.StatorCurrentLimit = Constants.elevatorCurrentLimit;
         configElevator_L.CurrentLimits.StatorCurrentLimitEnable = true;
+
         // configElevator_L.Voltage.PeakForwardVoltage = Constants.upVoltageCompensation;
 
         //SoftLimit
         configElevator_L.SoftwareLimitSwitch.ForwardSoftLimitThreshold = Constants.elevator_Max_Length;
-        configElevator_L.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
+        configElevator_L.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
         configElevator_L.SoftwareLimitSwitch.ReverseSoftLimitThreshold = Constants.elevator_Min_Length;
-        configElevator_L.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
+        configElevator_L.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
 
         configElevator_L.Feedback.SensorToMechanismRatio = (Constants.m_sensorToMechanismRatio);
 
@@ -112,24 +126,20 @@ public class elevatorSubsystem extends SubsystemBase{
 
         elevMotor_LConfigurator.apply(configElevator_L);
         elevMotor_LConfigurator.apply(motorOutputElevMotor_L);
+        
     }
     
-
+//for sysid
     private final SysIdRoutine m_SysIdRoutine=
         new SysIdRoutine(
-            new SysIdRoutine.Config(
-            null,
-            Volts.of(4),
-            null,
-            state ->SignalLogger.writeString("state",state.toString())
-        ),
+        new SysIdRoutine.Config(),
         new SysIdRoutine.Mechanism(
-            volts ->{elevMotor_R.setControl(elevator_voltageOut.withOutput(volts));
-                    elevMotor_L.setControl(new Follower(0, true));},
+            volts ->{elevMotor_L.setControl(elevator_voltageOut.withOutput(volts));
+                    elevMotor_R.setControl(new Follower(Constants.elevMotor_LID, true));},
             log ->{
                 log.motor("wrist-corol")
                 .voltage(m_voltageOut.mut_replace(
-                    elevMotor_R.getMotorVoltage().getValueAsDouble(), Volts))
+                    elevMotor_L.getMotorVoltage().getValueAsDouble(), Volts))
                 .linearPosition(m_distance.mut_replace(
                     getElevatorPosition(), Meters))
                 .linearVelocity(m_velocity.mut_replace(
@@ -139,28 +149,28 @@ public class elevatorSubsystem extends SubsystemBase{
 
          public elevatorSubsystem(){
             setName("elevator");
-            configElevMotor_R();
-            configElevMotor_L();
+
+
 
             TalonFXConfiguration elevMotorconfig = new TalonFXConfiguration();
+            elevMotor_L.getConfigurator().apply(elevMotorconfig);
             elevMotor_R.getConfigurator().apply(elevMotorconfig);
+            configElevMotor_L();
+            configElevMotor_R();
 
             BaseStatusSignal.setUpdateFrequencyForAll(250,
-             elevMotor_R.getPosition(),
-             elevMotor_R.getVelocity(),
-             elevMotor_R.getMotorVoltage());
+             elevMotor_L.getPosition(),
+             elevMotor_L.getVelocity(),
+             elevMotor_L.getMotorVoltage());
 
-             elevMotor_R.optimizeBusUtilization();
+             elevMotor_L.optimizeBusUtilization();
 
              SignalLogger.start();
          }
-        //  public void setVoltage(Voltage volts){
-        //     elevMotor_R.setControl(elevator_voltageOut.withOutput(volts));
-        //     elevMotor_L.setControl(elevator_voltageOut.withOutput(volts));
-        //  }
+        
 
          public Command jotStickDriveCommand(DoubleSupplier output){
-            return run(()->elevMotor_R.setControl(elevControl.withOutput(output.getAsDouble())));
+            return run(()->elevMotor_L.setControl(elevControl.withOutput(output.getAsDouble())));
          }
          public Command sysIdQuasistatic(SysIdRoutine.Direction direction){
             return m_SysIdRoutine.quasistatic(direction);
@@ -171,11 +181,11 @@ public class elevatorSubsystem extends SubsystemBase{
 
 
          private double getElevatorPosition(){
-            return elevMotor_R.getPosition().getValueAsDouble()*Math.PI*2*Constants.elevator_Max_Length;
+            return elevMotor_L.getPosition().getValueAsDouble()*Constants.pulleyCircumference_m;
          }
 
          private double getElevatorVelocity(){
-            return elevMotor_R.getVelocity().getValueAsDouble()*Math.PI*2*Constants.elevator_Max_Length;
+            return elevMotor_L.getVelocity().getValueAsDouble()*Constants.pulleyCircumference_m;
          }
         
 }
